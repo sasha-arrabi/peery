@@ -19,7 +19,7 @@ let onConnectionEventUnsubscribe;
 
 /**
  * Handling for paste and enter inputs to accept answer sdp.
- * @type { (e: ClipboardEvent | KeyboardEvent) => void }
+ * @type { (e: ClipboardEvent | KeyboardEvent | MouseEvent) => void }
  */
 const onTextAreaDataEntered = async (e) => {
   let encodedSdp = null;
@@ -29,7 +29,7 @@ const onTextAreaDataEntered = async (e) => {
   if (e.type === 'paste') {
     const clipboardEvent = /** @type { ClipboardEvent } */ (e);
     encodedSdp = clipboardEvent.clipboardData.getData('text/plain');
-  } else if (e.type === 'keypress' && e.key === 'Enter') {
+  } else if ((e.type === 'keypress' && e.key === 'Enter') || e.type === 'click') {
     e.preventDefault();
     encodedSdp = $('answer').value;
   }
@@ -188,6 +188,7 @@ async function init() {
   // Handle answer sdp input
   $('answer').addEventListener('paste', onTextAreaDataEntered);
   $('answer').addEventListener('keypress', onTextAreaDataEntered);
+  $('submit-answer-button').addEventListener('click', onTextAreaDataEntered);
   
   // Handle copy link button
   $('copy-link-button').addEventListener('click', (e) => copySdpToClipboard(e, encodedSdp, $('link-copied-message'), true));
