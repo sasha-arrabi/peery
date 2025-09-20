@@ -96,6 +96,12 @@ export class WebRTC {
   }
 
   #init = async (configuration, polite) => {
+    // Set default values
+    this.#dataChannels = {};
+    this.#makingOffer = false;
+    this.#ignoreOffer = false;
+    this.#isSettingRemoteAnswerPending = false;
+
     // Create a new RTCPeerConnection
     this.#configuration = configuration;
     this.#polite = polite;
@@ -107,7 +113,6 @@ export class WebRTC {
     // Setup event handlers for perfect negotiation: https://w3c.github.io/webrtc-pc/#perfect-negotiation-example
     this.#pc.addEventListener('icecandidate', ({ candidate }) => this.send(this.#SIGNALING_CHANNEL, { candidate }));
     this.#pc.addEventListener('negotiationneeded', this.#onNegotiationNeeded);
-    this.#pc.addEventListener('connectionstatechange', () => console.log('Connection state change:', this.#pc.connectionState));
     this.onMessage(this.#SIGNALING_CHANNEL, this.#onSignalingMessage);
   }
 
@@ -116,9 +121,7 @@ export class WebRTC {
   }
 
   #onNegotiationNeeded = async () => {
-    console.log('Time to negotiate!');
     if (this.connectionState === 'connected') {
-      console.log('Negotiation post connection')
       try {
         this.#makingOffer = true;
         await this.#pc.setLocalDescription();
@@ -136,7 +139,7 @@ export class WebRTC {
    * @param {{ data: { description: RTCSessionDescriptionInit | null; candidate: RTCIceCandidateInit | null } }} param0
    * @returns {Promise<void>}
    */
-  #onSignalingMessage = async ({ data: { description, candidate } }) => {
+  #onSignalingMessage = async ({ description, candidate }) => {
     try {
       if (description) {
         // An offer may come in while we are busy processing SRD(answer).
@@ -179,8 +182,14 @@ export class WebRTC {
   }
 
   /** Close the WebRTC connection. */
-  stop() {
+  close() {
     this.#pc.close();
+  }
+
+  /** Reset the WebRTC connection. */
+  reset() {
+    this.close();
+    this.#init(this.#configuration, this.#polite);
   }
 
   /**
@@ -189,12 +198,18 @@ export class WebRTC {
    * @returns {Promise<RTCSessionDescriptionInit>} a Promise that resolves to the created RTCSessionDescriptionInit object representing the offer.
    */
   async createOffer(options) {
-    console.log('Offer::Connection state: ', this.connectionState);
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     const offer = await this.#pc.createOffer(options);
     await this.#pc.setLocalDescription(offer);
-    console.log('Offer::Connection state: ', this.connectionState);
-    return offer;
+    // Wait for ICE gathering to complete
+    await new Promise((resolve, reject) => this.#pc.addEventListener('icecandidate', () => {
+      if (this.#pc.iceConnectionState === 'failed') {
+        reject(new Error('ICE connection failed.'));
+      } else {
+        resolve();
+      }
+    }));
+    return this.#pc.localDescription;
   }
 
   /**
@@ -203,24 +218,20 @@ export class WebRTC {
    * @returns {Promise<RTCSessionDescriptionInit>} a Promise that resolves to the created RTCSessionDescriptionInit object representing the answer.
    */
   async createAnswer(sdp) {
-    console.log('Answer::Connection state: ', this.connectionState);
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     const remoteSessionDescription = new RTCSessionDescription({ type: 'offer', sdp });
     await this.#pc.setRemoteDescription(remoteSessionDescription);
     const answer = await this.#pc.createAnswer();
     await this.#pc.setLocalDescription(answer);
-    console.log('Answer::Connection state: ', this.connectionState);
-    return answer;
+    return this.#pc.localDescription;
   }
 
   /**
    * @param {RTCSessionDescription} description
    */
   async completeConnection(description) {
-    console.log('Complete::Connection state: ', this.connectionState);
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     await this.#pc.setRemoteDescription(description);
-    console.log('Complete::Connection state: ', this.connectionState);
   }
 
   /**
@@ -231,7 +242,7 @@ export class WebRTC {
    * @param {any} data - The data to send.
    */
   async send(label, data) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     if (!this.#dataChannels[label]) {
       this.addDataChannel(label);
     }
@@ -248,7 +259,7 @@ export class WebRTC {
    * @param {MediaStream} stream - The media stream to add.
    */
   addStream(stream) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     for (const track of stream.getTracks()) {
       this.#pc.addTrack(track, stream);
     }
@@ -261,7 +272,7 @@ export class WebRTC {
    * @throws {Error} If a data channel with the specified label already exists.
    */
   addDataChannel(label, options) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     if (this.#dataChannels[label]) {
       throw new Error(`Data channel with label "${label}" already exists.`);
     }
@@ -299,7 +310,7 @@ export class WebRTC {
    * @returns {() => Promise<void>} - A function to remove the event listener.
    */
   onMessage(label, callback) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     if (!this.#dataChannels[label]) {
       this.addDataChannel(label);
     }
@@ -320,7 +331,7 @@ export class WebRTC {
    * @returns {() => void} - A function to remove the event listener.
    */
   onStreamAdded(callback) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     /** @type { (event: RTCTrackEvent) => void } */
     const callbackWrapper = (event) => callback(event.track, event.streams);
     this.#pc.addEventListener('track', callbackWrapper);
@@ -331,7 +342,7 @@ export class WebRTC {
    * @type { (event: keyof RTCPeerConnectionEventMap, callback: (ev: RTCPeerConnectionEventMap[typeof event]) => any, options?: boolean | AddEventListenerOptions) => () => void }
    */
   onConnectionEvent(event, callback, options) {
-    if (this.#closed) this.#init();
+    if (this.#closed) this.#init(this.#configuration, this.#polite);
     this.#pc.addEventListener(event, callback, options);
     return () => this.#pc.removeEventListener(event, callback, options);
   }

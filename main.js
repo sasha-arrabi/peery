@@ -54,14 +54,10 @@ const onTextAreaDataEntered = async (e) => {
 }
 
 const onConnectionStateChanged = async () => {
-  console.log('Connection state changed to:', connection.connectionState);
   if (connection.connectionState === 'disconnected' || connection.connectionState === 'failed') {
     // Handle disconnection
     history.replaceState({}, document.title, window.location.pathname);
-    $('loading').style.display = 'none';
-    $('join-call').style.display = 'none';
-    $('in-call').style.display = 'none';
-    $('start-call').style.display = 'initial';
+    endCall();
   } else if (connection.connectionState === 'connected') {
     // Handle successful connection
     $('loading').style.display = 'none';
@@ -105,7 +101,7 @@ async function copySdpToClipboard(e, encodedSdp, el, link = false) {
     }
     el.style.display = 'initial';
   } catch(error) {
-    console.error('Error copying SDP to clipboard: ', error);
+    console.warn('Error copying SDP to clipboard: ', error);
   }
 }
 
@@ -115,11 +111,19 @@ function endCall() {
     connection.close();
     connection = null;
     mediaStream.stopStream();
+    mediaStream = null;
     history.replaceState({}, document.title, window.location.pathname);
     $('join-call').style.display = 'none';
     $('in-call').style.display = 'none';
     $('start-call').style.display = 'none';
+    $('link-copied-message').style.display = 'none';
+    $('answer-code-copied-message').style.display = 'none';
+    $('local-stream').srcObject = null;
+    $('remote-stream').srcObject = null;
     $('loading').style.display = 'initial';
+    $('answer').value = '';
+    if (onStreamAddedUnsubscribe) onStreamAddedUnsubscribe();
+    if (onConnectionEventUnsubscribe) onConnectionEventUnsubscribe();
     init();
   }
 }
