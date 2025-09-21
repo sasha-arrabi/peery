@@ -70,13 +70,20 @@ export class WebRTC {
   #ignoreOffer = false;
   #isSettingRemoteAnswerPending = false;
   #SIGNALING_CHANNEL = 'signaling';
+  static #defaultIceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: "stun:stun.services.mozilla.com:3478" },
+    { urls: "stun:stunserver.stunprotocol.org:3478" },
+    { urls: 'stun:stun.freeswitch.org:3478' },
+    { urls: 'stun:stun.ekiga.net:3478'}
+  ];
 
   /**
    * Creates a polite WebRTC peer connection instance.
    * @returns {WebRTC} A polite WebRTC peer connection instance.
    */
   static createPoliteConnection() {
-    return new WebRTC({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }, true);
+    return new WebRTC({ iceServers: this.#defaultIceServers }, true);
   }
 
   /**
@@ -84,7 +91,7 @@ export class WebRTC {
    * @returns {WebRTC} An impolite WebRTC peer connection instance.
    */
   static createImpoliteConnection() {
-    return new WebRTC({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }, false);
+    return new WebRTC({ iceServers: this.#defaultIceServers }, false);
   }
 
   /**
