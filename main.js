@@ -42,10 +42,14 @@ const onTextAreaDataEntered = async (e) => {
   }
 
   try {
+    $('start-call').style.display = 'none';
+    $('loading').style.display = 'initial';
     const remoteSessionDescription = new RTCSessionDescription({ type:'answer', sdp });
     await connection.completeConnection(remoteSessionDescription);
   } catch (error) {
     handleError(error, 'Error while setting remote description from answer.');
+  } finally {
+    $('loading').style.display = 'none';
   }
 
   // Remove event listeners to prevent multiple submissions
@@ -77,7 +81,11 @@ const onConnectionStateChanged = async () => {
     }
 
     // Add local track to WebRTC connection
-    connection.addStream(localStream);
+    try {
+      connection.addStream(localStream);
+    } catch (error) {
+      handleError(error, 'Could not add local media stream to the WebRTC connection.');
+    }
   }
 };
 
@@ -138,6 +146,7 @@ function handleError(error, message) {
   $('join-call').style.display = 'none';
   $('error-message').style.display = 'initial';
   $('error-text').textContent = message ?? error.message;
+  $('stacktrace').textContent = error.stack ?? error.message;
   console.error(error);
   throw error;
 }
