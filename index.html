@@ -15,8 +15,7 @@
     <main>
         <div id="loading">
             <h2>Loading...</h2>
-            <p>Please wait while we set things up.</p>
-            <p>Make sure to enable your microphone and camera if prompted.</p>
+            <p>Connecting...</p>
         </div>
         <div id="start-call" style="display: none">
             <h2>Start a Call</h2>
@@ -27,11 +26,13 @@
             <textarea id="answer" placeholder="Paste or type answer code here"></textarea>
             <br><br>
             <button id="submit-answer-button">Complete connection</button>
+            <p><strong>Note</strong>: Make sure to allow access to your microphone and camera if prompted.</p>
         </div>
         <div id="join-call" style="display: none">
             <h2>Join a Call</h2>
             <p>Share your answer code with your friend to join the call:</p>
             <button id="copy-answer-code-button">Copy answer code</button><span id="answer-code-copied-message" style="display: none">&nbsp;Answer code copied!</span>
+            <p><strong>Note</strong>: Make sure to allow access to your microphone and camera if prompted.</p>
         </div>
         <div id="in-call" style="display: none">
             <h2>In Call</h2>
